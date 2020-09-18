@@ -190,47 +190,41 @@
 			<thead>
 				<tr>
 					<th></th>
-					<th>Severity</th>
-					<th>Number of Issues</th>
+					<th>Vulnerability Probability</th>
+					<th>Number of Hotspots</th>
 				</tr>
 			</thead>
 			<tbody>
 				<tr>
 					<td style="background-color:#2c3e50"></td>
-					<td>BLOCKER</td>
-					<td><%= summary.blocker %></td>
+					<td>HIGH</td>
+					<td><%= summary.high %></td>
 				</tr>
 				<tr>
 					<td style="background-color: #d43223"></td>
-					<td>CRITICAL</td>
-					<td><%= summary.critical %></td>
+					<td>MEDIUM</td>
+					<td><%= summary.medium %></td>
 				</tr>
 				<tr>
 					<td style="background-color: #f39c12"></td>
-					<td>MAJOR</td>
-					<td><%= summary.major %></td>
-				</tr>
-				<tr>
-					<td style="background-color: #319ddb"></td>
-					<td>MINOR</td>
-					<td><%= summary.minor %></td>
+					<td>LOW</td>
+					<td><%= summary.low %></td>
 				</tr>
 			</tbody>
 		</table>
 
-		<%if (issues.length > 0) { %>
+		<%if (hotspots.length > 0) { %>
 		<canvas id="vulnerabilitiesPieChart" width="200" height="200"></canvas>
 		<% } %>
 	</div>
 
 	<div class=detail>
-		<%if (issues.length > 0) { %>
+		<%if (hotspots.length > 0) { %>
 		<h2>Detail of the Detected Vulnerabilities</h2>
 		<table>
 			<thead>
 				<tr>
-					<th>Rule</th>
-					<th>Severity</th>
+					<th>Vulnerability Probability</th>
 					<th>Component</th>
 					<th>Line</th>
 					<th>Description</th>
@@ -240,16 +234,15 @@
 				</tr>
 			</thead>
 			<tbody>
-				<% for(var i = 0; i < issues.length; i++) { %>
+				<% for(var i = 0; i < hotspots.length; i++) { %>
 				<tr>
-					<td><a href="<%= sonarBaseURL %>/coding_rules#rule_key=<%= issues[i].rule %>"><%= issues[i].rule %></a></td>
-					<td><%= issues[i].severity %></td>
-					<td class="component"><%= issues[i].component %></td>
-					<td><%= issues[i].line %></td>
-					<td><%= issues[i].description %></td>
-					<td><%= issues[i].message %></td>
-					<td style="display:none;"><%= issues[i].key %></td>
-					<td><%= issues[i].status %></td>
+					<td><%= hotspots[i].vulnerabilityProbability %></td>
+					<td class="component"><%= hotspots[i].component %></td>
+					<td><%= hotspots[i].line %></td>
+					<td><%= hotspots[i].description %></td>
+					<td><%= hotspots[i].message %></td>
+					<td style="display:none;"><%= hotspots[i].key %></td>
+					<td><%= hotspots[i].status %></td>
 				</tr>
 				<% } %>
 			</tbody>
@@ -282,7 +275,7 @@
 		</table>
 	</div>
 
-	<%if (issues.length > 0) { %>
+	<%if (hotspots.length > 0) { %>
 
 	<script>
 		var canvas = document.getElementById("vulnerabilitiesPieChart");

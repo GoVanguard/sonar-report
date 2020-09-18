@@ -24,7 +24,7 @@ DESCRIPTION
         name of the release, displayed in the header of the generated report
 
     --branch
-        Branch in Sonarqube that we want to get the issues for
+        Branch in Sonarqube that we want to get the hotspots for
 
     --sonarurl
         base URL of the SonarQube instance to query from
@@ -61,11 +61,10 @@ DESCRIPTION
   process.exit();
 }
 
-var severity = new Map();
-severity.set('MINOR', 0);
-severity.set('MAJOR', 1);
-severity.set('CRITICAL', 2);
-severity.set('BLOCKER', 3);
+var vulnerabilityProbability = new Map();
+vulnerabilityProbability.set('LOW', 0);
+vulnerabilityProbability.set('MEDIUM', 1);
+vulnerabilityProbability.set('HIGH', 2);
 
 const data = {
   date: new Date().toDateString(),
@@ -82,7 +81,7 @@ const data = {
   sonarBaseURL: argv.sonarurl.replace(/\/$/, ""),
   sonarOrganization: argv.sonarorganization,
   rules: [],
-  issues: []
+  hotspots: []
 };
 
 const leakPeriodFilter = data.sinceLeakPeriod ? '&sinceLeakPeriod=true' : '';
@@ -95,19 +94,12 @@ const options = { headers: {} };
 let DEFAULT_FILTER="";
 let OPEN_STATUSES="";
 // Default filter gets only vulnerabilities
-if(data.noSecurityHotspot){
-  // For old versions of sonarQube (sonarQube won't accept filtering on a type that doesn't exist and will give HTTP 400 {"errors":[{"msg":"Value of parameter 'types' (SECURITY_HOTSPOT) must be one of: [CODE_SMELL, BUG, VULNERABILITY]"}]})
-  DEFAULT_FILTER="&types=VULNERABILITY"
-  OPEN_STATUSES="OPEN,CONFIRMED,REOPENED"
-}
-else{
-  // For newer versions of sonar, rules and issues may be of type VULNERABILITY or SECURITY_HOTSPOT
-  DEFAULT_FILTER="&types=VULNERABILITY,SECURITY_HOTSPOT"
-  // the security hotspot adds TO_REVIEW,IN_REVIEW
-  OPEN_STATUSES="OPEN,CONFIRMED,REOPENED,TO_REVIEW,IN_REVIEW"
-}
+// For newer versions of sonar, rules and hotspots may be of type VULNERABILITY or SECURITY_HOTSPOT
+DEFAULT_FILTER="&types=VULNERABILITY,SECURITY_HOTSPOT"
+// the security hotspot adds TO_REVIEW,IN_REVIEW
+OPEN_STATUSES="TO_REVIEW,IN_REVIEW"
 
-// filters for getting rules and issues
+// filters for getting rules and hotspots
 let filterRule = DEFAULT_FILTER;
 let filterIssue = DEFAULT_FILTER;
 
@@ -174,7 +166,7 @@ if (data.sinceLeakPeriod) {
       key: rule.key,
       htmlDesc: rule.htmlDesc,
       name: rule.name,
-      severity: rule.severity
+      vulnerabilityProbability: rule.vulnerabilityProbability
     })));
   } while (nbResults === pageSize);
 
@@ -195,8 +187,8 @@ if (data.sinceLeakPeriod) {
      * - set as in review
      *    "status": "IN_REVIEW"
      */
-    let query = `${sonarBaseURL}/api/issues/search?componentKeys=${sonarComponent}&ps=${pageSize}&p=${page}&statuses=${OPEN_STATUSES}&resolutions=&s=STATUS&asc=no${leakPeriodFilter}${filterIssue}${withOrganization}`
-    //console.log(query)
+    let query = `${sonarBaseURL}/api/hotspots/search?projectKey=${sonarComponent}&ps=${pageSize}&p=${page}&statuses=${OPEN_STATUSES}&onlyMine=false&sinceLeakPeriod=false`
+    /*console.log(query);*/
     const res = request(
       "GET",
       query,
@@ -204,35 +196,34 @@ if (data.sinceLeakPeriod) {
     );
     page++;
     const json = JSON.parse(res.getBody());
-    nbResults = json.issues.length;
-    data.issues = data.issues.concat(json.issues.map(issue => {
-      const rule = data.rules.find(rule => rule.key === issue.rule);
-      const message = rule ? rule.name : "/";
+    nbResults = json.hotspots.length;
+    /*console.log("Results");
+    console.log(nbResults);
+    console.log(json);*/
+    data.hotspots = data.hotspots.concat(json.hotspots.map(hotspot => {
       return {
-        rule: issue.rule,
-        // For security hotspots, the vulnerabilities show without a severity before they are confirmed
-        // In this case, get the severity from the rule
-        severity: (typeof issue.severity !== 'undefined') ? issue.severity : rule.severity,
-        status: issue.status,
+        // For security hotspots, the vulnerabilities show without a vulnerabilityProbability before they are confirmed
+        // In this case, get the vulnerabilityProbability from the rule
+        vulnerabilityProbability: hotspot.vulnerabilityProbability,
+        status: hotspot.status,
         // Take only filename with path, without project name
-        component: issue.component.split(':').pop(),
-        line: issue.line,
-        description: message,
-        message: issue.message,
-        key: issue.key
+        component: hotspot.component.split(':').pop(),
+        line: hotspot.line,
+        description: hotspot.message, 
+        message: hotspot.message,
+        key: hotspot.key
       };
     }));
   } while (nbResults === pageSize);
 
-  data.issues.sort(function (a, b) {
-    return severity.get(b.severity) - severity.get(a.severity);
+  data.hotspots.sort(function (a, b) {
+    return vulnerabilityProbability.get(b.vulnerabilityProbability) - vulnerabilityProbability.get(a.vulnerabilityProbability);
   });
 
   data.summary = {
-    blocker: data.issues.filter(issue => issue.severity === "BLOCKER").length,
-    critical: data.issues.filter(issue => issue.severity === "CRITICAL").length,
-    major: data.issues.filter(issue => issue.severity === "MAJOR").length,
-    minor: data.issues.filter(issue => issue.severity === "MINOR").length
+    high: data.hotspots.filter(hotspot => hotspot.vulnerabilityProbability === "HIGH").length,
+    medium: data.hotspots.filter(hotspot => hotspot.vulnerabilityProbability === "MEDIUM").length,
+    low: data.hotspots.filter(hotspot => hotspot.vulnerabilityProbability === "LOW").length,
   };
 }
 
